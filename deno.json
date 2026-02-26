@@ -1,6 +1,6 @@
 {
-    "name": "@chat/base",
-    "version": "1.0.0",
+    "name": "chat-base",
+    "version": "0.1.0",
     "exports": {
         ".": "./mod.ts",
         "./types": "./types.ts",
