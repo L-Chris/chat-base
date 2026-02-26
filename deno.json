@@ -1,0 +1,22 @@
+{
+    "name": "@chat/base",
+    "version": "1.0.0",
+    "exports": {
+        ".": "./mod.ts",
+        "./types": "./types.ts",
+        "./chunk-transformer": "./chunk-transformer.ts",
+        "./chat-utils": "./chat-utils.ts",
+        "./utils": "./utils.ts"
+    },
+    "imports": {
+        "eventsource-parser": "npm:eventsource-parser@^3.0.0",
+        "tokenx": "npm:tokenx@^0.4.1"
+    },
+    "tasks": {
+        "start": "deno run --allow-net --allow-read --allow-sys --allow-write --allow-env main.ts"
+    },
+    "compilerOptions": {
+        "jsx": "precompile",
+        "jsxImportSource": "hono/jsx"
+    }
+}
