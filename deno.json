@@ -7,11 +7,13 @@
         "./types": "./types.ts",
         "./chunk-transformer": "./chunk-transformer.ts",
         "./chat-utils": "./chat-utils.ts",
-        "./utils": "./utils.ts"
+        "./utils": "./utils.ts",
+        "./chat-service": "./chat-service.ts"
     },
     "imports": {
         "eventsource-parser": "npm:eventsource-parser@^3.0.0",
-        "tokenx": "npm:tokenx@^0.4.1"
+        "tokenx": "npm:tokenx@^0.4.1",
+        "hono": "jsr:@hono/hono@^4.7.2"
     },
     "tasks": {
         "start": "deno run --allow-net --allow-read --allow-sys --allow-write --allow-env main.ts"

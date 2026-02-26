@@ -102,4 +102,10 @@ export declare namespace OpenAI {
     is_tool_calling: boolean
     is_tool_calling_done: boolean
   }
+
+  interface Model {
+    id: string
+    name: string
+    description: string
+  }
 }

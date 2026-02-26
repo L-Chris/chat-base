@@ -26,7 +26,15 @@ export abstract class BaseChunkTransformer {
   protected config: OpenAI.ChatConfig
   protected messages: OpenAI.Message[]
   protected callbacks: (() => void)[] = []
-  protected abstract parser: EventSourceParser
+  private parser = createParser({
+    onEvent: e => {
+      try {
+        this.parse(e)
+      } catch (err) {
+        console.log('[chat-base] parse error:', err)
+      }
+    }
+  })
 
   constructor (
     req: Response,
@@ -68,7 +76,7 @@ export abstract class BaseChunkTransformer {
         this.parser.feed(decodedValue)
       }
     } catch (err) {
-      console.log(err)
+      console.log('[chat-base] read error:', err)
       this.send({ error: err instanceof Error ? err.message : 'unknown error' })
       this.send({ done: true })
     }
@@ -151,5 +159,4 @@ export enum CHUNK_TYPE {
   NONE = 'NONE'
 }
 
-export { createParser }
 export type { EventSourceParser }
