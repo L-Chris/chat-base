@@ -32,7 +32,7 @@ export const getChatConfig = (body: {
   }
 }
 
-export function extractFileUrlsFromMessages (data: OpenAI.Message[]) {
+export function extractFileUrlsFromMessages (data: OpenAI.Message[]): string[] {
   const res: string[] = []
 
   if (!data.length) return res
@@ -41,10 +41,10 @@ export function extractFileUrlsFromMessages (data: OpenAI.Message[]) {
 
   if (Array.isArray(lastMessage.content)) {
     lastMessage.content.forEach(v => {
-      if (!_.isObject(v) || !['file', 'image_url'].includes(v.type)) return
-      if (v['type'] == 'file' && _.isString(v.file_url?.url)) {
+      if (!(typeof v === 'object' && v !== null) || !['file', 'image_url'].includes(v.type)) return
+      if (v['type'] == 'file' && typeof v.file_url?.url === 'string') {
         res.push(v.file_url?.url!)
-      } else if (v['type'] == 'image_url' && _.isString(v.image_url?.url)) {
+      } else if (v['type'] == 'image_url' && typeof v.image_url?.url === 'string') {
         // 兼容gpt-4-vision-preview API格式
         res.push(v.image_url?.url!)
       }

@@ -19,8 +19,8 @@ export interface SendParams {
 export abstract class BaseChunkTransformer {
   protected streamController!: ReadableStreamDefaultController
   protected stream: ReadableStream
-  protected encoder = new TextEncoder()
-  protected decoder = new TextDecoder()
+  protected encoder: TextEncoder = new TextEncoder()
+  protected decoder: TextDecoder = new TextDecoder()
   protected content = ''
   protected thinkingContent = ''
   protected config: OpenAI.ChatConfig
@@ -133,7 +133,7 @@ export abstract class BaseChunkTransformer {
     this.callbacks.push(cb)
   }
 
-  getStream() {
+  getStream(): ReadableStream {
     return this.stream
   }
 }

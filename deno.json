@@ -1,6 +1,7 @@
 {
-    "name": "chat-base",
+    "name": "@rethinkos/chat-base",
     "version": "0.1.0",
+    "license": "MIT",
     "exports": {
         ".": "./mod.ts",
         "./types": "./types.ts",
