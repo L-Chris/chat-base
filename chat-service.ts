@@ -1,10 +1,12 @@
 import type { OpenAI } from "./types.ts";
-import { createParser, type EventSourceParser } from 'eventsource-parser'
+import { createParser } from 'eventsource-parser'
 import { approximateTokenSize } from 'tokenx'
 import { parseCredentials } from './utils.ts'
+import { buildChatConfig } from './config.ts'
 
 export abstract class BaseChatService {
   protected credentials: Record<string, string> = {}
+  protected req!: Request
   protected streamController!: ReadableStreamDefaultController
   protected encoder: TextEncoder = new TextEncoder()
   protected decoder: TextDecoder = new TextDecoder()
@@ -15,7 +17,7 @@ export abstract class BaseChatService {
   protected callbacks: (() => void)[] = []
 
   private parser = createParser({
-    onEvent: e => {
+    onEvent: (e: EventSourceMessage) => {
       try {
         this.parse(e)
       } catch (err) {
@@ -30,6 +32,7 @@ export abstract class BaseChatService {
    * Framework-agnostic entry point
    */
   async handleRequest(req: Request): Promise<Response> {
+    this.req = req
     this.credentials = parseCredentials(req);
 
     if (!this.credentials.token) {
@@ -102,26 +105,11 @@ export abstract class BaseChatService {
     tool_choice?: OpenAI.ToolChoice
     messages: OpenAI.Message[]
   }): OpenAI.ChatConfig {
-    const response_format: OpenAI.ChatConfig['response_format'] = body.response_format?.type ? body.response_format : { type: 'text' }
-    const stream = typeof body.stream === 'boolean' ? body.stream : true
-    const tools: OpenAI.Tool[] = body.tools || []
-    const is_tool_calling = tools.length > 0 && !body.messages.some(m => m.role === 'tool')
-    const is_tool_calling_done = tools.length > 0 && body.messages.some(m => m.role === 'tool')
-
-    const features = this.getModelFeatures(body.model);
-
-    return {
-      model_name: body.model,
-      features,
-      response_format,
-      chat_id: body.chat_id || '',
-      chat_type: features.searching ? 'search' : 't2t',
-      stream,
-      tools,
-      tool_choice: body.tool_choice || 'auto',
-      is_tool_calling,
-      is_tool_calling_done
-    }
+    return buildChatConfig({
+      ...body,
+      defaultStream: true,
+      modelFeatureResolver: model => this.getModelFeatures(model)
+    })
   }
 
   protected async readUpstream(res: Response) {
@@ -197,7 +185,7 @@ export abstract class BaseChatService {
         completion_tokens,
         total_tokens: prompt_tokens + completion_tokens
       }
-      message.choices[0].finish_reason = 'stop';
+      message.choices[0].finish_reason = params.finish_reason || 'stop';
       message.choices[0].delta = {}; // End chunk often has empty delta
 
       this.enqueue(message);

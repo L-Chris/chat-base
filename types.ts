@@ -34,8 +34,8 @@ export declare namespace OpenAI {
         tool_calls?: ToolCall[]
       }
       delta?: {
-        role: 'assistant' | 'user'
-        content: string
+        role?: 'assistant' | 'user'
+        content?: string
         reasoning_content?: string
         tool_calls?: ToolCall[]
       }
@@ -89,7 +89,7 @@ export declare namespace OpenAI {
     chat_type: 't2t' | 't2v' | 't2i' | 'search' | 'artifacts'
     model_name: string
     response_format: {
-      type: 'text' | 'json_schema'
+      type: 'text' | 'json_schema' | 'json_object'
       json_schema?: Record<string, any>
     }
     features: {
@@ -126,7 +126,28 @@ export declare namespace OpenAI {
     content?: string
     reasoning_content?: string
     citations?: string[]
+    finish_reason?: 'stop' | 'tool_calls'
     error?: string
     done?: boolean
+  }
+
+  interface UpstreamRequest {
+    url: string
+    init: RequestInit
+  }
+
+  interface UploadInput {
+    filename: string
+    mimeType: string
+    data: Uint8Array
+  }
+
+  interface UploadResult {
+    id: string
+    url: string
+    filename: string
+    mimeType: string
+    size: number
+    metadata?: Record<string, unknown>
   }
 }
