@@ -52,6 +52,29 @@ export declare namespace OpenAI {
     }
   }
 
+  interface CompletionResponse {
+    id: string
+    model: string
+    object: 'chat.completion'
+    citations: string[]
+    created: number
+    choices: {
+      index: number
+      message: {
+        role: 'assistant' | 'user'
+        content: string
+        reasoning_content?: string
+        tool_calls?: ToolCall[]
+      }
+      finish_reason: 'stop' | 'tool_calls'
+    }[]
+    usage: {
+      prompt_tokens: number
+      completion_tokens: number
+      total_tokens: number
+    }
+  }
+
   interface Tool {
     type: 'function'
     function: {
@@ -106,7 +129,7 @@ export declare namespace OpenAI {
   interface Model {
     id: string
     name: string
-    description: string
+    description?: string
   }
 
   enum CHUNK_TYPE {

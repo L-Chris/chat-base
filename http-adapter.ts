@@ -10,7 +10,7 @@ export interface HttpAdapterOptions {
 export function createOpenAICompatibleApp(options: HttpAdapterOptions) {
   const app = new Hono()
 
-  app.get('/v1/models', (c: any) => {
+  app.get('/v1/models', c => {
     const models = options.getModels().map(m => ({
       object: 'model',
       created: Math.trunc(Date.now() / 1000),
@@ -20,7 +20,7 @@ export function createOpenAICompatibleApp(options: HttpAdapterOptions) {
     return c.json({ object: 'list', data: models })
   })
 
-  app.post('/v1/chat/completions', async (c: any) => {
+  app.post('/v1/chat/completions', async c => {
     const service = options.createService(c.req.raw)
     return await service.handleRequest(c.req.raw)
   })

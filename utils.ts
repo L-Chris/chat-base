@@ -26,9 +26,11 @@ export function safeJSONParse(data: string): any {
 }
 
 export function parseCredentials(req: Request): Record<string, string> {
-  const authContent = (req.headers.get('authorization') || '').replace(/^Bearer /, "");
+  const authContent = (req.headers.get('authorization') || '')
+    .replace(/^Bearer\s+/i, '')
+    .trim();
   const authMap: Record<string, string> = {};
-  const parts = authContent.split(/\s+/);
+  const parts = authContent ? authContent.split(/\s+/).filter(Boolean) : [];
 
   if (parts.length === 0) return authMap;
   if (parts.length === 1) {

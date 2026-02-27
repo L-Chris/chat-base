@@ -13,10 +13,7 @@ export const getChatConfig = (body: {
   return buildChatConfig({
     ...body,
     defaultStream: false,
-    modelFeatureResolver: model => {
-      const features = resolveModelFeaturesByName(model)
-      return features
-    }
+    modelFeatureResolver: resolveModelFeaturesByName
   })
 }
 

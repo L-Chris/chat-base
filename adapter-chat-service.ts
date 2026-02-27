@@ -11,7 +11,7 @@ export class AdapterChatService extends BaseChatService {
     const upstream = await this.adapter.buildUpstreamRequest({
       req: this.req,
       credentials: this.credentials,
-      config: this.config,
+      config: this.getUpstreamChatConfig(),
       messages: this.messages
     })
 
