@@ -108,4 +108,25 @@ export declare namespace OpenAI {
     name: string
     description: string
   }
+
+  enum CHUNK_TYPE {
+    ERROR = 'ERROR',
+    START = 'START',
+    DEEPSEARCHING = 'DEEPSEARCHING',
+    SEARCHING = 'SEARCHING',
+    SEARCHING_DONE = 'SEARCHING_DONE',
+    THINKING = 'THINKING',
+    TEXT = 'TEXT',
+    SUGGESTION = 'SUGGESTION',
+    DONE = 'DONE',
+    NONE = 'NONE'
+  }
+
+  interface SendParams {
+    content?: string
+    reasoning_content?: string
+    citations?: string[]
+    error?: string
+    done?: boolean
+  }
 }

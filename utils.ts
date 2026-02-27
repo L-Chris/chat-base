@@ -6,15 +6,42 @@ export function extractJsonFromContent (data: string): unknown {
   try {
     const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
     const match = data.match(jsonRegex);
-    
-    if (!match || !match[1]) return JSON.parse(data);
-    
+
+    if (!match || !match[1]) return safeJSONParse(data);
+
     const jsonString = match[1].trim();
-    return JSON.parse(jsonString);
+    return safeJSONParse(jsonString);
   } catch (error) {
     console.error('解析JSON失败:', error);
     return null;
   }
+}
+
+export function safeJSONParse(data: string): any {
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function parseCredentials(req: Request): Record<string, string> {
+  const authContent = (req.headers.get('authorization') || '').replace(/^Bearer /, "");
+  const authMap: Record<string, string> = {};
+  const parts = authContent.split(/\s+/);
+
+  if (parts.length === 0) return authMap;
+  if (parts.length === 1) {
+    authMap.token = parts[0];
+    return authMap;
+  }
+
+  parts.forEach((part) => {
+    const [key, value] = part.split(":");
+    if (key && value) authMap[key] = value;
+  });
+
+  return authMap;
 }
 
 export const dataUtil: {

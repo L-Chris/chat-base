@@ -5,7 +5,6 @@
     "exports": {
         ".": "./mod.ts",
         "./types": "./types.ts",
-        "./chunk-transformer": "./chunk-transformer.ts",
         "./chat-utils": "./chat-utils.ts",
         "./utils": "./utils.ts",
         "./chat-service": "./chat-service.ts"
