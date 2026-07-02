@@ -14,6 +14,13 @@ export interface ChatApiServerOptions<TAuth> {
   enableCors?: boolean;
   chatPath?: string;
   modelsPath?: string;
+  routes?: ChatApiRoute[];
+}
+
+export interface ChatApiRoute {
+  provider: ChatProvider<unknown>;
+  chatPath?: string;
+  modelsPath?: string;
 }
 
 export class ChatApiServer<TAuth = unknown> {
@@ -50,8 +57,20 @@ export class ChatApiServer<TAuth = unknown> {
       return typeof root === "string" ? c.text(root) : c.json(root);
     });
 
+    this.installProviderRoutes({
+      provider: this.options.provider as ChatProvider<unknown>,
+      chatPath: this.options.chatPath,
+      modelsPath: this.options.modelsPath,
+    });
+
+    for (const route of this.options.routes ?? []) {
+      this.installProviderRoutes(route);
+    }
+  }
+
+  private installProviderRoutes(route: ChatApiRoute): void {
     this.app.post(
-      this.options.chatPath ?? "/v1/chat/completions",
+      route.chatPath ?? "/v1/chat/completions",
       async (c) => {
         const body = await c.req.json() as ChatCompletionRequest;
         const messages = body?.messages as ChatMessage[] | undefined;
@@ -62,35 +81,34 @@ export class ChatApiServer<TAuth = unknown> {
           );
         }
 
-        const context = await this.createRequestContext(c.req.raw);
-        const config = this.options.provider.buildConfig(body);
+        const context = await this.createRequestContext(c.req.raw, route);
+        const config = route.provider.buildConfig(body);
         const input = { body, messages, config, context };
 
         if (config.stream) {
-          const stream = await this.options.provider.createChatCompletionStream(
-            input,
-          );
+          const stream = await route.provider.createChatCompletionStream(input);
           return sseResponse(stream);
         }
 
-        const response = await this.options.provider.createChatCompletion(
-          input,
-        );
+        const response = await route.provider.createChatCompletion(input);
         return c.json(response);
       },
     );
 
-    this.app.get(this.options.modelsPath ?? "/v1/models", async (c) => {
-      const context = await this.createRequestContext(c.req.raw);
-      const models = await this.options.provider.listModels(context);
+    this.app.get(route.modelsPath ?? "/v1/models", async (c) => {
+      const context = await this.createRequestContext(c.req.raw, route);
+      const models = await route.provider.listModels(context);
       return c.json(normalizeModels(models));
     });
   }
 
   private async createRequestContext(
     request: Request,
-  ): Promise<RequestContext<TAuth>> {
-    const auth = await this.options.provider.authenticate(request.headers);
+    route: ChatApiRoute = {
+      provider: this.options.provider as ChatProvider<unknown>,
+    },
+  ): Promise<RequestContext<unknown>> {
+    const auth = await route.provider.authenticate(request.headers);
     return { auth, headers: request.headers, rawRequest: request };
   }
 
