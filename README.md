@@ -4,19 +4,19 @@
 wrappers. It provides the shared server, stream, type, and utility layers used
 to build provider adapters without copying request and SSE boilerplate.
 
-Current package: `@rethinkos/chat-base@0.2.0`
+Current package: `@rethinkos/chat-base@0.5.0`
 
 ## Layers
 
 - `core`: provider abstraction, Hono server wrapper, auth helpers, API errors,
-  chat config strategy.
+  chat config strategy, provider lifecycle helpers.
 - `openai`: OpenAI-compatible request/response types and response builders.
 - `stream`: SSE helpers, OpenAI stream writer, inheritable EventSource
-  transformer.
+  transformer, mapped JSON chunk transformer.
 - `tools`: message utilities, JSON extraction/repair, file/base64 helpers, tool
   calling protocols.
 - `adapters`: compatibility adapters such as Responses API input/output
-  conversion.
+  conversion and OpenAI-compatible upstream clients.
 
 ## Usage
 
@@ -84,6 +84,59 @@ class ExampleStream extends EventSourceOpenAITransformer {
     writer.write({ content: chunk.text ?? "" });
   }
 }
+```
+
+## Provider Lifecycle
+
+```ts
+import {
+  runConversationCompletion,
+  runConversationStream,
+} from "@rethinkos/chat-base";
+
+const stream = await runConversationStream({
+  createConversation: () => createConversation(auth),
+  cleanupConversation: (conversation) => removeConversation(conversation.id),
+  createStream: (conversation) => requestProviderStream(conversation.id),
+});
+```
+
+## OpenAI-Compatible Upstream
+
+```ts
+import { OpenAICompatibleClient } from "@rethinkos/chat-base/adapters";
+
+const upstream = new OpenAICompatibleClient({
+  baseUrl: "https://api.example.com",
+  apiKey: Deno.env.get("API_KEY"),
+  jsonSchemaMode: "json_object",
+});
+
+const response = await upstream.createCompletion({
+  model: "example-chat",
+  messages,
+  responseFormat: body.response_format,
+  tools: body.tools,
+});
+```
+
+## Mapped JSON Stream
+
+```ts
+import { MappedJsonEventSourceOpenAITransformer } from "@rethinkos/chat-base/stream";
+
+const transformer = new MappedJsonEventSourceOpenAITransformer(response, {
+  model,
+  messages,
+  mapChunk: (chunk) => {
+    if (chunk.type === "text") return { type: "content", content: chunk.text };
+    if (chunk.type === "thinking") {
+      return { type: "reasoning", content: chunk.text };
+    }
+    if (chunk.done) return { type: "finish" };
+    return { type: "ignore" };
+  },
+});
 ```
 
 ## Development

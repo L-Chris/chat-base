@@ -1,5 +1,5 @@
 import { createParser } from "eventsource-parser";
-import type { ChatMessage } from "../openai/types.ts";
+import type { ChatMessage, FinishReason } from "../openai/types.ts";
 import { OpenAIStreamWriter } from "./openai-stream.ts";
 
 export interface EventSourceMessage {
@@ -13,6 +13,7 @@ export interface EventSourceTransformerHooks {
   onRawChunk?: (chunkText: string, rawChunk: Uint8Array) => void;
   onError?: (message: string) => void;
   onDone?: () => void;
+  onFinish?: (finishReason: Exclude<FinishReason, null>) => void;
 }
 
 export interface EventSourceTransformerOptions {
@@ -78,6 +79,7 @@ export abstract class EventSourceOpenAITransformer {
     if (this.finished) return;
     this.finished = true;
     writer.finish(options);
+    this.hooks.onFinish?.(options.finishReason ?? "stop");
     this.hooks.onDone?.();
     this.callbacks.forEach((callback) => callback());
   }
