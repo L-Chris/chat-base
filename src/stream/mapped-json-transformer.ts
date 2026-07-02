@@ -4,7 +4,10 @@ import type {
   ToolCall,
   Usage,
 } from "../openai/types.ts";
-import type { EventSourceMessage } from "./event-source-transformer.ts";
+import type {
+  EventSourceMessage,
+  EventSourceTransformerHooks,
+} from "./event-source-transformer.ts";
 import { JsonEventSourceOpenAITransformer } from "./event-source-transformer.ts";
 import type { OpenAIStreamWriter } from "./openai-stream.ts";
 
@@ -32,6 +35,7 @@ export type StreamActionResult =
 export interface MappedJsonTransformerOptions<TChunk> {
   model: string;
   messages: ChatMessage[];
+  hooks?: EventSourceTransformerHooks;
   mapChunk: (
     chunk: TChunk,
     event: EventSourceMessage,
@@ -55,6 +59,7 @@ export class MappedJsonEventSourceOpenAITransformer<
     super(response, {
       model: mappedOptions.model,
       messages: mappedOptions.messages,
+      hooks: mappedOptions.hooks,
     });
   }
 
