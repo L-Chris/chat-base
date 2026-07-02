@@ -54,7 +54,7 @@ const SUFFIX_POOL = [
 export class DelimitedToolProtocol {
   readonly markers: ToolCallDelimiterMarkers;
 
-  constructor(markers = createToolCallMarkers()) {
+  constructor(markers: ToolCallDelimiterMarkers = createToolCallMarkers()) {
     this.markers = markers;
   }
 

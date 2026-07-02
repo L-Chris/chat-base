@@ -20,7 +20,7 @@ export function parseKeyValueBearer(
 export function envFallbackToken(
   authHeader: string | null | undefined,
   envName: string,
-  ignoredValues = new Set(["", "any-token", "test"]),
+  ignoredValues: Set<string> = new Set(["", "any-token", "test"]),
 ): string {
   const token = bearerToken(authHeader);
   if (!ignoredValues.has(token)) return token;

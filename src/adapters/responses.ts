@@ -28,6 +28,63 @@ export interface ResponsesContentPart {
   image_url?: string;
 }
 
+export type ResponsesOutputItem =
+  | ResponsesReasoningOutputItem
+  | ResponsesMessageOutputItem;
+
+export interface ResponsesReasoningOutputItem {
+  type: "reasoning";
+  id: string;
+  summary: Array<{ type: "summary_text"; text: string }>;
+}
+
+export interface ResponsesMessageOutputItem {
+  type: "message";
+  id: string;
+  status: "completed";
+  role: "assistant";
+  content: Array<{
+    type: "output_text";
+    text: string;
+    annotations: unknown[];
+    logprobs: unknown[];
+  }>;
+}
+
+export interface ResponsesResponse {
+  id: string;
+  object: "response";
+  created_at: number;
+  completed_at: number;
+  status: "completed";
+  model: string;
+  output: ResponsesOutputItem[];
+  usage: {
+    input_tokens: number;
+    input_tokens_details: null;
+    output_tokens: number;
+    output_tokens_details: null;
+    total_tokens: number;
+  };
+  error: null;
+  incomplete_details: null;
+  instructions: string | null;
+  max_output_tokens: null;
+  max_tool_calls: null;
+  previous_response_id: null;
+  prompt_cache_key: null;
+  reasoning: null;
+  safety_identifier: null;
+  service_tier: null;
+  tools: null;
+  text: null;
+  temperature: null;
+  top_p: null;
+  tool_choice: null;
+  parallel_tool_calls: boolean;
+  metadata: Record<string, string>;
+}
+
 export function responsesInputToMessages(
   request: ResponsesRequest,
 ): ChatMessage[] {
@@ -54,14 +111,14 @@ export function responsesInputToMessages(
 export function chatCompletionToResponses(
   completion: ChatCompletionChunk,
   options: { instructions?: string | null } = {},
-) {
+): ResponsesResponse {
   const choice = completion.choices[0];
   const message = choice.message;
   const content = message?.content ?? "";
   const reasoning = message?.reasoning_content ?? "";
   const now = nowUnixSeconds();
 
-  const output = [];
+  const output: ResponsesOutputItem[] = [];
   if (reasoning) {
     output.push({
       type: "reasoning",

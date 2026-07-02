@@ -17,21 +17,24 @@ export interface ChatApiServerOptions<TAuth> {
 }
 
 export class ChatApiServer<TAuth = unknown> {
-  readonly app = new Hono();
+  readonly app: Hono = new Hono();
 
   constructor(private readonly options: ChatApiServerOptions<TAuth>) {
     this.configure();
   }
 
-  fetch = (request: Request) => this.app.fetch(request);
+  fetch = (request: Request): Response | Promise<Response> =>
+    this.app.fetch(request);
 
-  listen(options: { port?: number; hostname?: string } = {}) {
+  listen(
+    options: { port?: number; hostname?: string } = {},
+  ): Deno.HttpServer<Deno.NetAddr> {
     const port = options.port ?? Number(Deno.env.get("PORT") ?? "8000");
     const hostname = options.hostname ?? "0.0.0.0";
     return Deno.serve({ hostname, port }, this.fetch);
   }
 
-  private configure() {
+  private configure(): void {
     if (this.options.enableCors) this.installCors();
 
     this.app.onError((error, c) => {
@@ -91,7 +94,7 @@ export class ChatApiServer<TAuth = unknown> {
     return { auth, headers: request.headers, rawRequest: request };
   }
 
-  private installCors() {
+  private installCors(): void {
     this.app.use("*", async (c, next) => {
       if (c.req.method === "OPTIONS") {
         return new Response(null, {
