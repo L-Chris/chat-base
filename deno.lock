@@ -1,7 +1,6 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@hono/hono@^4.7.2": "4.7.2",
     "jsr:@hono/hono@^4.8.0": "4.12.3",
     "jsr:@std/crypto@1": "1.0.5",
     "npm:eventsource-parser@3": "3.0.0",
@@ -9,9 +8,6 @@
     "npm:tokenx@~0.4.1": "0.4.1"
   },
   "jsr": {
-    "@hono/hono@4.7.2": {
-      "integrity": "73466a24bd6eb3b527cde18e59ca5543890ddacb4312fc0bc7504d28a7e57a38"
-    },
     "@hono/hono@4.12.3": {
       "integrity": "53c2d99912626a8bc293d6f69649af8148961b05d44485f2c0ed3053657d324c"
     },
@@ -33,7 +29,6 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@hono/hono@^4.7.2",
       "jsr:@hono/hono@^4.8.0",
       "npm:eventsource-parser@3",
       "npm:jsonrepair@^3.12.0",

@@ -1,107 +1,94 @@
 # chat-base
 
-`chat-base` 是一个 Deno/TypeScript 的通用聊天网关基础库，提供：
+`chat-base` is a Deno-first base library for OpenAI-compatible chat API
+wrappers. It provides the shared server, stream, type, and utility layers used
+to build provider adapters without copying request and SSE boilerplate.
 
-- OpenAI 兼容类型与流式输出骨架
-- Provider 适配器契约（便于不同上游接入）
-- Hono HTTP 路由适配层（`/v1/chat/completions` 与 `/v1/models`）
-- 上传抽象（默认实现 + URL 输入转换）
+Current package: `@rethinkos/chat-base@0.2.0`
 
-当前版本：`1.0.0`
+## Layers
 
-## 安装与导入
+- `core`: provider abstraction, Hono server wrapper, auth helpers, API errors,
+  chat config strategy.
+- `openai`: OpenAI-compatible request/response types and response builders.
+- `stream`: SSE helpers, OpenAI stream writer, inheritable EventSource
+  transformer.
+- `tools`: message utilities, JSON extraction/repair, file/base64 helpers, tool
+  calling protocols.
+- `adapters`: compatibility adapters such as Responses API input/output
+  conversion.
+
+## Usage
 
 ```ts
 import {
-  AdapterChatService,
-  createOpenAICompatibleApp,
-  type OpenAI,
-  type ProviderAdapter,
-} from "chat-base";
+  BaseChatProvider,
+  bearerToken,
+  ChatApiServer,
+  invalidRequestError,
+  ModelFlagChatConfigStrategy,
+} from "@rethinkos/chat-base";
+
+class ExampleProvider extends BaseChatProvider<string> {
+  readonly name = "example";
+  private readonly config = new ModelFlagChatConfigStrategy({
+    defaultModel: "example",
+  });
+
+  authenticate(headers: Headers): string {
+    const token = bearerToken(headers.get("authorization"));
+    if (!token) throw invalidRequestError("need token", "missing_token");
+    return token;
+  }
+
+  buildConfig(body) {
+    return this.config.build({
+      model: body.model,
+      stream: body.stream,
+      messages: body.messages,
+      responseFormat: body.response_format,
+      tools: body.tools,
+      toolChoice: body.tool_choice,
+    });
+  }
+
+  async createChatCompletion(input) {
+    throw new Error("not implemented");
+  }
+
+  async createChatCompletionStream(input) {
+    throw new Error("not implemented");
+  }
+
+  listModels() {
+    return { data: [{ id: "example" }] };
+  }
+}
+
+const server = new ChatApiServer({ provider: new ExampleProvider() });
+server.listen();
 ```
 
-## 设计分层
-
-1. 核心层：`BaseChatService`、`buildChatConfig`、`utils`
-2. Provider 契约层：`provider-contracts.ts`
-3. HTTP 适配层：`http-adapter.ts`
-4. 上传层：`upload.ts`
-
-## 最小 Provider Adapter 示例
+## Stream Adapter
 
 ```ts
-import {
-  AdapterChatService,
-  createOpenAICompatibleApp,
-  type OpenAI,
-  type ProviderAdapter,
-} from "chat-base";
+import { EventSourceOpenAITransformer } from "@rethinkos/chat-base/stream";
 
-const provider: ProviderAdapter = {
-  name: "demo",
-  getModels:
-    () => [{ id: "demo-model", name: "demo-model", description: "demo" }],
-  getModelFeatures: () => ({ thinking: false, searching: false }),
-  buildUpstreamRequest: async ({ credentials, messages, config }) => ({
-    url: "https://example.com/chat",
-    init: {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${credentials.token}`,
-      },
-      body: JSON.stringify({
-        model: config.model_name,
-        messages,
-        stream: true,
-      }),
-    },
-  }),
-  parseEvent: (event): OpenAI.SendParams | null => {
-    if (!event.data || event.data === "[DONE]") return { done: true };
-    const payload = JSON.parse(event.data);
-    if (payload.error) {
-      return { error: payload.error.message || "upstream error" };
+class ExampleStream extends EventSourceOpenAITransformer {
+  protected handleEvent(event, writer) {
+    if (event.data === "[DONE]") {
+      this.finish(writer);
+      return;
     }
-    const text = payload?.choices?.[0]?.delta?.content || "";
-    return text ? { content: text } : null;
-  },
-};
-
-const app = createOpenAICompatibleApp({
-  createService: () => new AdapterChatService(provider),
-  getModels: provider.getModels,
-});
-
-export default app;
+    const chunk = JSON.parse(event.data);
+    writer.write({ content: chunk.text ?? "" });
+  }
+}
 ```
 
-## 上传抽象
-
-```ts
-import { DefaultUploader, fetchUploadInputFromUrl } from "chat-base";
-
-const uploader = new DefaultUploader();
-const input = await fetchUploadInputFromUrl(
-  "https://example.com/a.png",
-  "a.png",
-);
-const uploaded = await uploader.upload(input, { credentials: { token: "x" } });
-```
-
-## 兼容与稳定性
-
-- `stream` 默认值为 `true`
-- `response_format.type` 支持：`text`、`json_schema`、`json_object`
-- `chat-utils.getChatConfig` 保留为兼容入口，但内部已委托 `buildChatConfig`
-- 新增 `src/core`、`src/openai`、`src/stream`、`src/tools`、`src/adapters`
-  分层导出，用于后续更面向对象的 provider 接入。
-
-`1.x` 主版本保证导出 API 稳定；新增能力仅做向后兼容扩展。
-
-## 开发命令
+## Development
 
 ```bash
 deno task check
-deno task test
+deno publish --dry-run
 ```

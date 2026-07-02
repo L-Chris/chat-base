@@ -4,15 +4,6 @@
   "license": "MIT",
   "exports": {
     ".": "./mod.ts",
-    "./types": "./types.ts",
-    "./chat-utils": "./chat-utils.ts",
-    "./utils": "./utils.ts",
-    "./chat-service": "./chat-service.ts",
-    "./adapter-chat-service": "./adapter-chat-service.ts",
-    "./provider-contracts": "./provider-contracts.ts",
-    "./http-adapter": "./http-adapter.ts",
-    "./upload": "./upload.ts",
-    "./config": "./config.ts",
     "./core": "./src/core/mod.ts",
     "./openai": "./src/openai/mod.ts",
     "./stream": "./src/stream/mod.ts",
@@ -23,15 +14,19 @@
     "eventsource-parser": "npm:eventsource-parser@^3.0.0",
     "jsonrepair": "npm:jsonrepair@^3.12.0",
     "tokenx": "npm:tokenx@^0.4.1",
-    "@hono/hono": "jsr:@hono/hono@^4.8.0",
-    "hono": "jsr:@hono/hono@^4.7.2"
+    "@hono/hono": "jsr:@hono/hono@^4.8.0"
   },
   "tasks": {
     "check": "deno check mod.ts",
     "test": "deno test --allow-net --allow-read --allow-write --allow-env"
   },
-  "compilerOptions": {
-    "jsx": "precompile",
-    "jsxImportSource": "hono/jsx"
+  "publish": {
+    "include": [
+      "README.md",
+      "deno.json",
+      "deno.lock",
+      "mod.ts",
+      "src/**/*.ts"
+    ]
   }
 }
