@@ -1,7 +1,9 @@
 import type {
   ChatCompletionChunk,
   ChatMessage,
+  ResponseFormat,
   Tool,
+  ToolChoice,
 } from "../openai/types.ts";
 import { createId, nowUnixSeconds } from "../tools/ids.ts";
 
@@ -10,9 +12,13 @@ export interface ResponsesRequest {
   input: string | ResponsesInputItem[];
   instructions?: string;
   stream?: boolean;
+  temperature?: number;
+  max_output_tokens?: number;
   tools?: Tool[];
-  response_format?: unknown;
+  tool_choice?: ToolChoice;
+  response_format?: ResponseFormat;
   previous_response_id?: string;
+  metadata?: Record<string, string>;
   [key: string]: unknown;
 }
 
@@ -24,8 +30,9 @@ export interface ResponsesInputItem {
 export interface ResponsesContentPart {
   type: "input_text" | "input_file" | "input_image" | "output_text";
   text?: string;
-  file?: { file_id: string };
-  image_url?: string;
+  file?: { file_id?: string };
+  file_id?: string;
+  image_url?: string | { url?: string };
 }
 
 export type ResponsesOutputItem =
@@ -35,7 +42,12 @@ export type ResponsesOutputItem =
 export interface ResponsesReasoningOutputItem {
   type: "reasoning";
   id: string;
-  summary: Array<{ type: "summary_text"; text: string }>;
+  summary: ResponsesReasoningSummary[];
+}
+
+export interface ResponsesReasoningSummary {
+  type: "summary_text";
+  text: string;
 }
 
 export interface ResponsesMessageOutputItem {
@@ -43,46 +55,50 @@ export interface ResponsesMessageOutputItem {
   id: string;
   status: "completed";
   role: "assistant";
-  content: Array<{
-    type: "output_text";
-    text: string;
-    annotations: unknown[];
-    logprobs: unknown[];
-  }>;
+  content: ResponsesMessageContent[];
+}
+
+export interface ResponsesMessageContent {
+  type: "output_text";
+  text: string;
+  annotations: unknown[];
+  logprobs: unknown[];
 }
 
 export interface ResponsesResponse {
   id: string;
   object: "response";
   created_at: number;
-  completed_at: number;
-  status: "completed";
+  completed_at: number | null;
+  status: "completed" | "failed" | "in_progress";
   model: string;
   output: ResponsesOutputItem[];
-  usage: {
-    input_tokens: number;
-    input_tokens_details: null;
-    output_tokens: number;
-    output_tokens_details: null;
-    total_tokens: number;
-  };
-  error: null;
+  usage: ResponsesUsage;
+  error: null | { message: string; type: string; code?: string };
   incomplete_details: null;
   instructions: string | null;
-  max_output_tokens: null;
+  max_output_tokens: number | null;
   max_tool_calls: null;
-  previous_response_id: null;
+  previous_response_id: string | null;
   prompt_cache_key: null;
   reasoning: null;
   safety_identifier: null;
-  service_tier: null;
-  tools: null;
-  text: null;
-  temperature: null;
+  service_tier: string | null;
+  tools: Tool[] | null;
+  text: null | { type: "text" };
+  temperature: number | null;
   top_p: null;
-  tool_choice: null;
+  tool_choice: ToolChoice | null;
   parallel_tool_calls: boolean;
   metadata: Record<string, string>;
+}
+
+export interface ResponsesUsage {
+  input_tokens: number;
+  input_tokens_details: null;
+  output_tokens: number;
+  output_tokens_details: null;
+  total_tokens: number;
 }
 
 export function responsesInputToMessages(

@@ -4,6 +4,12 @@ import type {
   ChatMessage,
   ListModelsResponse,
 } from "../openai/types.ts";
+import type { ResponsesRequest } from "../adapters/responses.ts";
+import {
+  buildResponsesResponse,
+  responsesRequestToChatCompletionRequest,
+  ResponsesStreamAdapter,
+} from "../openai/responses-api.ts";
 import { apiErrorBody, invalidRequestError, toApiError } from "./errors.ts";
 import type { ChatProvider, RequestContext } from "./provider.ts";
 import { sseResponse } from "../stream/sse.ts";
@@ -14,13 +20,15 @@ export interface ChatApiServerOptions<TAuth> {
   enableCors?: boolean;
   chatPath?: string;
   modelsPath?: string;
+  responsesPath?: string;
   routes?: ChatApiRoute[];
 }
 
 export interface ChatApiRoute {
-  provider: ChatProvider<any>;
+  provider: ChatProvider<unknown>;
   chatPath?: string;
   modelsPath?: string;
+  responsesPath?: string;
 }
 
 export class ChatApiServer<TAuth = unknown> {
@@ -57,10 +65,17 @@ export class ChatApiServer<TAuth = unknown> {
       return typeof root === "string" ? c.text(root) : c.json(root);
     });
 
+    this.app.get("/health", (c) =>
+      c.json({
+        status: "ok",
+        provider: this.options.provider.name,
+      }));
+
     this.installProviderRoutes({
-      provider: this.options.provider as ChatProvider<any>,
+      provider: this.options.provider as ChatProvider<unknown>,
       chatPath: this.options.chatPath,
       modelsPath: this.options.modelsPath,
+      responsesPath: this.options.responsesPath,
     });
 
     for (const route of this.options.routes ?? []) {
@@ -100,12 +115,43 @@ export class ChatApiServer<TAuth = unknown> {
       const models = await route.provider.listModels(context);
       return c.json(normalizeModels(models));
     });
+
+    this.app.post(route.responsesPath ?? "/v1/responses", async (c) => {
+      const body = await c.req.json() as ResponsesRequest;
+      const chatBody = responsesRequestToChatCompletionRequest(body);
+      const messages = chatBody.messages as ChatMessage[] | undefined;
+      if (!Array.isArray(messages) || messages.length === 0) {
+        throw invalidRequestError(
+          "input is required and must produce at least one message",
+          "invalid_input",
+        );
+      }
+
+      const context = await this.createRequestContext(c.req.raw, route);
+      const config = route.provider.buildConfig(chatBody);
+      const input = { body: chatBody, messages, config, context };
+
+      if (config.stream) {
+        const stream = await route.provider.createChatCompletionStream(input);
+        const adapter = new ResponsesStreamAdapter(stream, {
+          model: config.modelName || config.model,
+          request: body,
+        });
+        return sseResponse(adapter.getStream());
+      }
+
+      const completion = await route.provider.createChatCompletion(input);
+      return c.json(buildResponsesResponse(completion, {
+        model: config.modelName || config.model,
+        request: body,
+      }));
+    });
   }
 
   private async createRequestContext(
     request: Request,
     route: ChatApiRoute = {
-      provider: this.options.provider as ChatProvider<any>,
+      provider: this.options.provider as ChatProvider<unknown>,
     },
   ): Promise<RequestContext<unknown>> {
     const auth = await route.provider.authenticate(request.headers);
