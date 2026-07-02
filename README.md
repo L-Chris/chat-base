@@ -4,7 +4,7 @@
 wrappers. It provides the shared server, stream, type, and utility layers used
 to build provider adapters without copying request and SSE boilerplate.
 
-Current package: `@rethinkos/chat-base@0.6.0`
+Current package: `@rethinkos/chat-base@0.6.1`
 
 ## Layers
 

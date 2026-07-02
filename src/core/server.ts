@@ -18,7 +18,7 @@ export interface ChatApiServerOptions<TAuth> {
 }
 
 export interface ChatApiRoute {
-  provider: ChatProvider<unknown>;
+  provider: ChatProvider<any>;
   chatPath?: string;
   modelsPath?: string;
 }
@@ -58,7 +58,7 @@ export class ChatApiServer<TAuth = unknown> {
     });
 
     this.installProviderRoutes({
-      provider: this.options.provider as ChatProvider<unknown>,
+      provider: this.options.provider as ChatProvider<any>,
       chatPath: this.options.chatPath,
       modelsPath: this.options.modelsPath,
     });
@@ -105,7 +105,7 @@ export class ChatApiServer<TAuth = unknown> {
   private async createRequestContext(
     request: Request,
     route: ChatApiRoute = {
-      provider: this.options.provider as ChatProvider<unknown>,
+      provider: this.options.provider as ChatProvider<any>,
     },
   ): Promise<RequestContext<unknown>> {
     const auth = await route.provider.authenticate(request.headers);
