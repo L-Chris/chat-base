@@ -71,6 +71,14 @@ export function base64ToUint8Array(value: string): Uint8Array {
   );
 }
 
+export function bytesToBase64(bytes: Uint8Array, chunkSize = 0x8000): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 export function isImageMime(mimeType: string): boolean {
   return IMAGE_MIME_TYPES.has(mimeType.toLowerCase());
 }

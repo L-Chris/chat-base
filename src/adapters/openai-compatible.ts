@@ -1,4 +1,15 @@
 import type {
+  BaseChatConfig,
+  ChatRunInput,
+  RequestContext,
+} from "../core/mod.ts";
+import {
+  BaseChatProvider,
+  bearerToken,
+  missingAuthError,
+  ModelFlagChatConfigStrategy,
+} from "../core/mod.ts";
+import type {
   ChatCompletionChunk,
   ChatCompletionRequest,
   ChatMessage,
@@ -33,6 +44,17 @@ export interface OpenAICompatibleRequestOptions {
   toolChoice?: ToolChoice;
   extra?: Record<string, unknown>;
   apiKey?: string;
+}
+
+export interface OpenAICompatibleProviderOptions<TAuth = string>
+  extends OpenAICompatibleClientOptions {
+  providerName: string;
+  defaultModel: string;
+  separator?: "_" | "-";
+  modelNameFilter?: (parts: string[]) => string;
+  authenticate?: (headers: Headers) => Promise<TAuth> | TAuth;
+  tokenFromAuth?: (auth: TAuth) => string | undefined;
+  missingAuthMessage?: string;
 }
 
 export class OpenAICompatibleClient {
@@ -110,6 +132,102 @@ export class OpenAICompatibleClient {
   }
 }
 
+export class OpenAICompatibleProvider<TAuth = string>
+  extends BaseChatProvider<TAuth> {
+  readonly name: string;
+  private readonly client: OpenAICompatibleClient;
+  private readonly configStrategy: ModelFlagChatConfigStrategy;
+
+  constructor(
+    private readonly providerOptions: OpenAICompatibleProviderOptions<TAuth>,
+  ) {
+    super();
+    this.name = providerOptions.providerName;
+    this.client = new OpenAICompatibleClient(providerOptions);
+    this.configStrategy = new ModelFlagChatConfigStrategy({
+      defaultModel: providerOptions.defaultModel,
+      separator: providerOptions.separator,
+      modelNameFilter: providerOptions.modelNameFilter,
+    });
+  }
+
+  authenticate(headers: Headers): Promise<TAuth> | TAuth {
+    if (this.providerOptions.authenticate) {
+      return this.providerOptions.authenticate(headers);
+    }
+
+    const token = bearerToken(headers.get("authorization"));
+    if (!token) {
+      throw missingAuthError(
+        this.providerOptions.missingAuthMessage ?? "need token",
+      );
+    }
+    return token as TAuth;
+  }
+
+  buildConfig(body: ChatCompletionRequest): BaseChatConfig {
+    return this.configStrategy.build({
+      chatId: body.id as string | undefined,
+      model: body.model,
+      stream: body.stream,
+      responseFormat: body.response_format,
+      tools: body.tools,
+      toolChoice: body.tool_choice,
+      messages: body.messages,
+    });
+  }
+
+  async createChatCompletion(
+    input: ChatRunInput<TAuth>,
+  ): Promise<ChatCompletionChunk> {
+    return await this.client.createCompletion({
+      apiKey: this.apiKey(input.context.auth),
+      model: input.config.modelName,
+      messages: input.messages,
+      responseFormat: input.config.responseFormat,
+      tools: input.config.tools,
+      toolChoice: input.config.toolChoice,
+    });
+  }
+
+  async createChatCompletionStream(
+    input: ChatRunInput<TAuth>,
+  ): Promise<ReadableStream<Uint8Array>> {
+    return await this.client.createCompletionStream({
+      apiKey: this.apiKey(input.context.auth),
+      model: input.config.modelName,
+      messages: input.messages,
+      responseFormat: input.config.responseFormat,
+      tools: input.config.tools,
+      toolChoice: input.config.toolChoice,
+    });
+  }
+
+  async listModels(
+    context: RequestContext<TAuth>,
+  ): Promise<ListModelsResponse> {
+    return await this.client.listModels(this.apiKey(context.auth));
+  }
+
+  private apiKey(auth: TAuth): string {
+    const token = this.providerOptions.tokenFromAuth
+      ? this.providerOptions.tokenFromAuth(auth)
+      : defaultTokenFromAuth(auth);
+    if (!token) {
+      throw missingAuthError(
+        this.providerOptions.missingAuthMessage ?? "need token",
+      );
+    }
+    return token;
+  }
+}
+
+export function createOpenAICompatibleProvider<TAuth = string>(
+  options: OpenAICompatibleProviderOptions<TAuth>,
+): OpenAICompatibleProvider<TAuth> {
+  return new OpenAICompatibleProvider(options);
+}
+
 export function buildOpenAICompatibleChatBody(
   options: OpenAICompatibleRequestOptions & {
     jsonSchemaMode?: OpenAICompatibleClientOptions["jsonSchemaMode"];
@@ -164,4 +282,13 @@ function resolveResponseFormat(
     return undefined;
   }
   return responseFormat;
+}
+
+function defaultTokenFromAuth<TAuth>(auth: TAuth): string | undefined {
+  if (typeof auth === "string") return auth;
+  if (auth && typeof auth === "object" && "token" in auth) {
+    const token = (auth as { token?: unknown }).token;
+    return typeof token === "string" ? token : undefined;
+  }
+  return undefined;
 }

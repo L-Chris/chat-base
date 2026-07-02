@@ -6,6 +6,7 @@ import type {
   Usage,
 } from "../openai/types.ts";
 import {
+  type ChatCompletionNormalizationOptions,
   createChatCompletion,
   normalizeChatCompletionResponse,
 } from "../openai/responses.ts";
@@ -42,6 +43,14 @@ export interface CompletionFromStreamOptions extends CompletionStreamOptions {
   tools?: Tool[];
   defaultUsage?: Usage;
   normalize?: boolean;
+}
+
+export interface CreateCompletionFromStreamOptions {
+  stream: ReadableStream<Uint8Array>;
+  model: string;
+  defaultUsage?: Usage;
+  normalize?: boolean;
+  normalization?: ChatCompletionNormalizationOptions;
 }
 
 export class ProviderApiClient {
@@ -92,20 +101,16 @@ export class ProviderApiClient {
     options: CompletionFromStreamOptions,
   ): Promise<ChatCompletionChunk> {
     const stream = await this.createCompletionStream(options);
-    const collected = await collectOpenAIStream(stream, {
+    return await createCompletionFromStream({
+      stream,
       model: options.model,
-    });
-    const response = createChatCompletionFromCollected(
-      collected,
-      options.model,
-      options.defaultUsage,
-    );
-    return options.normalize === false
-      ? response
-      : normalizeChatCompletionResponse(response, {
+      defaultUsage: options.defaultUsage,
+      normalize: options.normalize,
+      normalization: {
         responseFormat: options.responseFormat,
         tools: options.tools,
-      });
+      },
+    });
   }
 
   private async formatError(response: Response): Promise<string> {
@@ -119,6 +124,22 @@ export class ProviderApiClient {
       : "API error";
     return `${prefix}: ${response.status} ${message}`;
   }
+}
+
+export async function createCompletionFromStream(
+  options: CreateCompletionFromStreamOptions,
+): Promise<ChatCompletionChunk> {
+  const collected = await collectOpenAIStream(options.stream, {
+    model: options.model,
+  });
+  const response = createChatCompletionFromCollected(
+    collected,
+    options.model,
+    options.defaultUsage,
+  );
+  return options.normalize === false
+    ? response
+    : normalizeChatCompletionResponse(response, options.normalization);
 }
 
 export function createChatCompletionFromCollected(

@@ -7,7 +7,10 @@ import type {
 } from "./types.ts";
 import { createId, nowUnixSeconds } from "../tools/ids.ts";
 import { extractJsonFromContent } from "../tools/json.ts";
-import { BracketToolProtocol } from "../tools/tool-calling.ts";
+import {
+  BracketToolProtocol,
+  type ToolCallProtocol,
+} from "../tools/tool-calling.ts";
 
 export function createChatChunk(params: {
   model: string;
@@ -135,6 +138,7 @@ export interface ChatCompletionNormalizationOptions {
   tools?: Tool[];
   parseTools?: boolean;
   extractJson?: boolean;
+  toolProtocol?: ToolCallProtocol;
 }
 
 export function normalizeChatCompletionResponse<T extends ChatCompletionChunk>(
@@ -156,7 +160,8 @@ export function normalizeChatCompletionResponse<T extends ChatCompletionChunk>(
 
   const shouldParseTools = options.parseTools ?? !!options.tools?.length;
   if (shouldParseTools && options.tools?.length) {
-    const { cleanContent, toolCalls } = new BracketToolProtocol().parse(
+    const protocol = options.toolProtocol ?? new BracketToolProtocol();
+    const { cleanContent, toolCalls } = protocol.parse(
       choice.message.content ?? "",
     );
     choice.message.content = cleanContent;

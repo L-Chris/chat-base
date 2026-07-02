@@ -19,6 +19,20 @@ export interface ToolCallDelimiterMarkers {
   RESULT_END: string;
 }
 
+export interface ToolCallParseResult {
+  toolCalls: ToolCall[];
+  cleanContent: string;
+}
+
+export interface ToolCallProtocol {
+  parse(content: string): ToolCallParseResult;
+}
+
+export interface ToolCallBufferResult {
+  content: string[];
+  toolCalls: ToolCall[];
+}
+
 const DELIMITER_SETS = [
   { open: "༒", close: "༒", mid: "࿇" },
   { open: "꧁", close: "꧂", mid: "꧔" },
@@ -101,7 +115,7 @@ Rules:
     return `${this.markers.RESULT_START}[${name}]\n${content}\n${this.markers.RESULT_END}`;
   }
 
-  parse(content: string): { toolCalls: ToolCall[]; cleanContent: string } {
+  parse(content: string): ToolCallParseResult {
     const regex = new RegExp(
       `${escapeRegex(this.markers.TC_START)}\\s*` +
         `${escapeRegex(this.markers.NAME_START)}([\\s\\S]*?)${
@@ -167,7 +181,7 @@ value
     return lines.join("\n");
   }
 
-  parse(content: string): { toolCalls: ToolCall[]; cleanContent: string } {
+  parse(content: string): ToolCallParseResult {
     const block = content.match(/\[ToolCalls\]([\s\S]*?)\[\/ToolCalls\]/);
     if (!block) return { toolCalls: [], cleanContent: content.trim() };
 
@@ -194,6 +208,99 @@ value
       toolCalls,
       cleanContent: content.replace(block[0], "").trim(),
     };
+  }
+}
+
+export class DelimitedToolCallBuffer {
+  private pendingText = "";
+  private bufferingTool = false;
+  private toolBuffer = "";
+  private nextIndex = 0;
+
+  constructor(private readonly protocol: DelimitedToolProtocol) {}
+
+  push(incoming: string): ToolCallBufferResult {
+    const output = emptyBufferResult();
+    this.pushInto(incoming, output);
+    return output;
+  }
+
+  flush(): ToolCallBufferResult {
+    const output = emptyBufferResult();
+    if (this.pendingText && !this.bufferingTool) {
+      this.pushInto("", output, true);
+    }
+    if (this.bufferingTool) {
+      this.finalizeToolCall(output, false);
+    }
+    return output;
+  }
+
+  private pushInto(
+    incoming: string,
+    output: ToolCallBufferResult,
+    forceFlush = false,
+  ): void {
+    const markers = this.protocol.markers;
+
+    if (this.bufferingTool) {
+      this.toolBuffer += incoming;
+      const endIndex = this.toolBuffer.indexOf(markers.TC_END);
+      if (endIndex !== -1) {
+        const afterEnd = this.toolBuffer.slice(
+          endIndex + markers.TC_END.length,
+        );
+        this.toolBuffer = this.toolBuffer.slice(0, endIndex);
+        this.finalizeToolCall(output, true);
+        if (afterEnd) this.pushInto(afterEnd, output, forceFlush);
+      }
+      return;
+    }
+
+    const combined = this.pendingText + incoming;
+    const startIndex = combined.indexOf(markers.TC_START);
+
+    if (startIndex === -1) {
+      const safeEnd = forceFlush
+        ? combined.length
+        : findPartialMatchEndIndex(combined, markers.TC_START);
+      if (safeEnd > 0) output.content.push(combined.slice(0, safeEnd));
+      this.pendingText = combined.slice(safeEnd);
+      return;
+    }
+
+    if (startIndex > 0) output.content.push(combined.slice(0, startIndex));
+    this.pendingText = "";
+    this.bufferingTool = true;
+    this.toolBuffer = combined.slice(startIndex + markers.TC_START.length);
+    this.pushInto("", output, forceFlush);
+  }
+
+  private finalizeToolCall(
+    output: ToolCallBufferResult,
+    completed: boolean,
+  ): void {
+    const markers = this.protocol.markers;
+    const { cleanContent, toolCalls } = this.protocol.parse(
+      markers.TC_START + this.toolBuffer + (completed ? markers.TC_END : ""),
+    );
+
+    if (toolCalls.length) {
+      if (cleanContent) output.content.push(cleanContent);
+      output.toolCalls.push(
+        ...toolCalls.map((toolCall) => ({
+          ...toolCall,
+          index: this.nextIndex++,
+        })),
+      );
+    } else {
+      output.content.push(
+        markers.TC_START + this.toolBuffer + (completed ? markers.TC_END : ""),
+      );
+    }
+
+    this.bufferingTool = false;
+    this.toolBuffer = "";
   }
 }
 
@@ -250,4 +357,8 @@ function escapeRegex(value: string): string {
 
 function pick<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
+}
+
+function emptyBufferResult(): ToolCallBufferResult {
+  return { content: [], toolCalls: [] };
 }
