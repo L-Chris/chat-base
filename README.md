@@ -13,11 +13,11 @@
 
 ```ts
 import {
-	AdapterChatService,
-	createOpenAICompatibleApp,
-	type ProviderAdapter,
-	type OpenAI
-} from '@rethinkos/chat-base'
+  AdapterChatService,
+  createOpenAICompatibleApp,
+  type OpenAI,
+  type ProviderAdapter,
+} from "chat-base";
 ```
 
 ## 设计分层
@@ -31,56 +31,62 @@ import {
 
 ```ts
 import {
-	AdapterChatService,
-	createOpenAICompatibleApp,
-	type ProviderAdapter,
-	type OpenAI
-} from '@rethinkos/chat-base'
+  AdapterChatService,
+  createOpenAICompatibleApp,
+  type OpenAI,
+  type ProviderAdapter,
+} from "chat-base";
 
 const provider: ProviderAdapter = {
-	name: 'demo',
-	getModels: () => [{ id: 'demo-model', name: 'demo-model', description: 'demo' }],
-	getModelFeatures: () => ({ thinking: false, searching: false }),
-	buildUpstreamRequest: async ({ credentials, messages, config }) => ({
-		url: 'https://example.com/chat',
-		init: {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				authorization: `Bearer ${credentials.token}`
-			},
-			body: JSON.stringify({
-				model: config.model_name,
-				messages,
-				stream: true
-			})
-		}
-	}),
-	parseEvent: (event): OpenAI.SendParams | null => {
-		if (!event.data || event.data === '[DONE]') return { done: true }
-		const payload = JSON.parse(event.data)
-		if (payload.error) return { error: payload.error.message || 'upstream error' }
-		const text = payload?.choices?.[0]?.delta?.content || ''
-		return text ? { content: text } : null
-	}
-}
+  name: "demo",
+  getModels:
+    () => [{ id: "demo-model", name: "demo-model", description: "demo" }],
+  getModelFeatures: () => ({ thinking: false, searching: false }),
+  buildUpstreamRequest: async ({ credentials, messages, config }) => ({
+    url: "https://example.com/chat",
+    init: {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${credentials.token}`,
+      },
+      body: JSON.stringify({
+        model: config.model_name,
+        messages,
+        stream: true,
+      }),
+    },
+  }),
+  parseEvent: (event): OpenAI.SendParams | null => {
+    if (!event.data || event.data === "[DONE]") return { done: true };
+    const payload = JSON.parse(event.data);
+    if (payload.error) {
+      return { error: payload.error.message || "upstream error" };
+    }
+    const text = payload?.choices?.[0]?.delta?.content || "";
+    return text ? { content: text } : null;
+  },
+};
 
 const app = createOpenAICompatibleApp({
-	createService: () => new AdapterChatService(provider),
-	getModels: provider.getModels
-})
+  createService: () => new AdapterChatService(provider),
+  getModels: provider.getModels,
+});
 
-export default app
+export default app;
 ```
 
 ## 上传抽象
 
 ```ts
-import { DefaultUploader, fetchUploadInputFromUrl } from '@rethinkos/chat-base'
+import { DefaultUploader, fetchUploadInputFromUrl } from "chat-base";
 
-const uploader = new DefaultUploader()
-const input = await fetchUploadInputFromUrl('https://example.com/a.png', 'a.png')
-const uploaded = await uploader.upload(input, { credentials: { token: 'x' } })
+const uploader = new DefaultUploader();
+const input = await fetchUploadInputFromUrl(
+  "https://example.com/a.png",
+  "a.png",
+);
+const uploaded = await uploader.upload(input, { credentials: { token: "x" } });
 ```
 
 ## 兼容与稳定性
@@ -88,6 +94,8 @@ const uploaded = await uploader.upload(input, { credentials: { token: 'x' } })
 - `stream` 默认值为 `true`
 - `response_format.type` 支持：`text`、`json_schema`、`json_object`
 - `chat-utils.getChatConfig` 保留为兼容入口，但内部已委托 `buildChatConfig`
+- 新增 `src/core`、`src/openai`、`src/stream`、`src/tools`、`src/adapters`
+  分层导出，用于后续更面向对象的 provider 接入。
 
 `1.x` 主版本保证导出 API 稳定；新增能力仅做向后兼容扩展。
 
@@ -97,4 +105,3 @@ const uploaded = await uploader.upload(input, { credentials: { token: 'x' } })
 deno task check
 deno task test
 ```
-

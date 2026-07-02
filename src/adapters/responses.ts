@@ -1,0 +1,132 @@
+import type {
+  ChatCompletionChunk,
+  ChatMessage,
+  Tool,
+} from "../openai/types.ts";
+import { createId, nowUnixSeconds } from "../tools/ids.ts";
+
+export interface ResponsesRequest {
+  model: string;
+  input: string | ResponsesInputItem[];
+  instructions?: string;
+  stream?: boolean;
+  tools?: Tool[];
+  response_format?: unknown;
+  previous_response_id?: string;
+  [key: string]: unknown;
+}
+
+export interface ResponsesInputItem {
+  role: "user" | "assistant" | "system" | "developer";
+  content: string | ResponsesContentPart[];
+}
+
+export interface ResponsesContentPart {
+  type: "input_text" | "input_file" | "input_image" | "output_text";
+  text?: string;
+  file?: { file_id: string };
+  image_url?: string;
+}
+
+export function responsesInputToMessages(
+  request: ResponsesRequest,
+): ChatMessage[] {
+  const messages: ChatMessage[] = [];
+  if (request.instructions) {
+    messages.push({ role: "system", content: request.instructions });
+  }
+
+  if (typeof request.input === "string") {
+    messages.push({ role: "user", content: request.input });
+    return messages;
+  }
+
+  for (const item of request.input) {
+    messages.push({
+      role: item.role === "developer" ? "system" : item.role,
+      content: responsesContentToText(item.content),
+    });
+  }
+
+  return messages;
+}
+
+export function chatCompletionToResponses(
+  completion: ChatCompletionChunk,
+  options: { instructions?: string | null } = {},
+) {
+  const choice = completion.choices[0];
+  const message = choice.message;
+  const content = message?.content ?? "";
+  const reasoning = message?.reasoning_content ?? "";
+  const now = nowUnixSeconds();
+
+  const output = [];
+  if (reasoning) {
+    output.push({
+      type: "reasoning",
+      id: createId("rs"),
+      summary: [{ type: "summary_text", text: reasoning }],
+    });
+  }
+  output.push({
+    type: "message",
+    id: createId("msg"),
+    status: "completed",
+    role: "assistant",
+    content: [{
+      type: "output_text",
+      text: content,
+      annotations: [],
+      logprobs: [],
+    }],
+  });
+
+  return {
+    id: createId("resp"),
+    object: "response",
+    created_at: completion.created ?? now,
+    completed_at: now,
+    status: "completed",
+    model: completion.model,
+    output,
+    usage: {
+      input_tokens: completion.usage?.prompt_tokens ?? 0,
+      input_tokens_details: null,
+      output_tokens: completion.usage?.completion_tokens ?? 0,
+      output_tokens_details: null,
+      total_tokens: completion.usage?.total_tokens ?? 0,
+    },
+    error: null,
+    incomplete_details: null,
+    instructions: options.instructions ?? null,
+    max_output_tokens: null,
+    max_tool_calls: null,
+    previous_response_id: null,
+    prompt_cache_key: null,
+    reasoning: null,
+    safety_identifier: null,
+    service_tier: null,
+    tools: null,
+    text: null,
+    temperature: null,
+    top_p: null,
+    tool_choice: null,
+    parallel_tool_calls: true,
+    metadata: {},
+  };
+}
+
+function responsesContentToText(
+  content: string | ResponsesContentPart[],
+): string {
+  if (typeof content === "string") return content;
+  return content.map((part) => {
+    if (part.type === "input_text" || part.type === "output_text") {
+      return part.text ?? "";
+    }
+    if (part.type === "input_image") return part.image_url ?? "";
+    if (part.type === "input_file") return part.file?.file_id ?? "";
+    return "";
+  }).join("");
+}

@@ -1,0 +1,187 @@
+import type {
+  ChatCompletionChunk,
+  ChatMessage,
+  ResponseFormat,
+  Usage,
+} from "./types.ts";
+import { createId, nowUnixSeconds } from "../tools/ids.ts";
+
+export function createChatChunk(params: {
+  model: string;
+  id?: string;
+  created?: number;
+  content?: string;
+  reasoningContent?: string;
+  citations?: unknown[];
+}): ChatCompletionChunk {
+  return {
+    id: params.id ?? createId("chatcmpl"),
+    object: "chat.completion.chunk",
+    created: params.created ?? nowUnixSeconds(),
+    model: params.model,
+    choices: [{
+      index: 0,
+      delta: {
+        role: "assistant",
+        content: params.content ?? "",
+        reasoning_content: params.reasoningContent ?? "",
+      },
+      finish_reason: null,
+    }],
+    citations: params.citations ?? [],
+  };
+}
+
+export function createDoneChunk(params: {
+  model: string;
+  id?: string;
+  created?: number;
+  content?: string;
+  reasoningContent?: string;
+  usage?: Usage;
+  finishReason?: "stop" | "tool_calls" | "length" | "content_filter";
+}): ChatCompletionChunk {
+  return {
+    id: params.id ?? createId("chatcmpl"),
+    object: "chat.completion.chunk",
+    created: params.created ?? nowUnixSeconds(),
+    model: params.model,
+    choices: [{
+      index: 0,
+      delta: {
+        role: "assistant",
+        content: params.content ?? "",
+        reasoning_content: params.reasoningContent ?? "",
+      },
+      finish_reason: params.finishReason ?? "stop",
+    }],
+    usage: params.usage,
+    citations: [],
+  };
+}
+
+export function createErrorChunk(params: {
+  model: string;
+  message: string;
+  type?: string;
+  code?: string;
+  id?: string;
+  created?: number;
+}): ChatCompletionChunk {
+  return {
+    id: params.id ?? createId("chatcmpl"),
+    object: "chat.completion.chunk",
+    created: params.created ?? nowUnixSeconds(),
+    model: params.model,
+    choices: [{
+      index: 0,
+      delta: { role: "assistant", content: "" },
+      finish_reason: null,
+    }],
+    citations: [],
+    error: {
+      message: params.message,
+      type: params.type ?? "server_error",
+      code: params.code,
+    },
+  };
+}
+
+export function createChatCompletion(params: {
+  model: string;
+  content: string;
+  reasoningContent?: string;
+  usage: Usage;
+  id?: string;
+  created?: number;
+  finishReason?: "stop" | "tool_calls" | "length" | "content_filter";
+  toolCalls?: ChatCompletionChunk["choices"][number]["message"] extends infer M
+    ? M extends { tool_calls?: infer T } ? T
+    : never
+    : never;
+  citations?: unknown[];
+}): ChatCompletionChunk {
+  return {
+    id: params.id ?? createId("chatcmpl"),
+    object: "chat.completion",
+    created: params.created ?? nowUnixSeconds(),
+    model: params.model,
+    choices: [{
+      index: 0,
+      message: {
+        role: "assistant",
+        content: params.content,
+        reasoning_content: params.reasoningContent,
+        tool_calls: params.toolCalls,
+      },
+      finish_reason: params.finishReason ?? "stop",
+    }],
+    usage: params.usage,
+    citations: params.citations ?? [],
+  };
+}
+
+export function normalizeResponseFormat(
+  responseFormat?: ResponseFormat,
+): ResponseFormat {
+  return responseFormat?.type ? responseFormat : { type: "text" };
+}
+
+export function normalizeJsonSchema(
+  responseFormat?: ResponseFormat,
+): Record<string, unknown> | null {
+  if (!responseFormat || responseFormat.type !== "json_schema") return null;
+  const jsonSchema = responseFormat.json_schema;
+  if (!jsonSchema || Array.isArray(jsonSchema)) return null;
+  if (
+    "schema" in jsonSchema && jsonSchema.schema &&
+    typeof jsonSchema.schema === "object" && !Array.isArray(jsonSchema.schema)
+  ) {
+    return jsonSchema.schema as Record<string, unknown>;
+  }
+  return jsonSchema as Record<string, unknown>;
+}
+
+export function appendJsonSchemaPrompt<T extends ChatMessage>(
+  messages: T[],
+  responseFormat?: ResponseFormat,
+  options: { mutate?: boolean; language?: "zh" | "en" } = {},
+): T[] {
+  const schema = normalizeJsonSchema(responseFormat);
+  if (!schema && responseFormat?.type !== "json_object") return messages;
+
+  const target = options.mutate ? messages : [...messages];
+  const lastUserIndex = target.findLastIndex((message) =>
+    message.role === "user"
+  );
+  if (lastUserIndex < 0) return target;
+
+  const prompt = schema
+    ? buildJsonSchemaPrompt(schema, options.language)
+    : buildJsonObjectPrompt(options.language);
+  const message = target[lastUserIndex];
+  if (typeof message.content === "string") {
+    target[lastUserIndex] = { ...message, content: message.content + prompt };
+  }
+  return target;
+}
+
+export function buildJsonSchemaPrompt(
+  schema: Record<string, unknown>,
+  language: "zh" | "en" = "zh",
+): string {
+  if (language === "en") {
+    return `\nReturn only valid JSON matching this JSON Schema. Do not include Markdown or extra prose.\nSchema:\n${
+      JSON.stringify(schema, null, 2)
+    }`;
+  }
+  return `\n请严格按照以下 JSON Schema 返回有效 JSON。不要返回 Markdown 或额外说明，只返回 JSON 数据本身。\nSchema:\n${
+    JSON.stringify(schema, null, 2)
+  }`;
+}
+
+export function buildJsonObjectPrompt(language: "zh" | "en" = "zh"): string {
+  return language === "en"
+    ? "\nReturn only a valid JSON object. Do not include Markdown or extra prose."
+    : "\n请返回有效 JSON object。不要返回 Markdown 或额外说明，只返回 JSON 对象本身。";
+}
