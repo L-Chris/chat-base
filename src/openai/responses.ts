@@ -2,9 +2,12 @@ import type {
   ChatCompletionChunk,
   ChatMessage,
   ResponseFormat,
+  Tool,
   Usage,
 } from "./types.ts";
 import { createId, nowUnixSeconds } from "../tools/ids.ts";
+import { extractJsonFromContent } from "../tools/json.ts";
+import { BracketToolProtocol } from "../tools/tool-calling.ts";
 
 export function createChatChunk(params: {
   model: string;
@@ -125,6 +128,45 @@ export function normalizeResponseFormat(
   responseFormat?: ResponseFormat,
 ): ResponseFormat {
   return responseFormat?.type ? responseFormat : { type: "text" };
+}
+
+export interface ChatCompletionNormalizationOptions {
+  responseFormat?: ResponseFormat;
+  tools?: Tool[];
+  parseTools?: boolean;
+  extractJson?: boolean;
+}
+
+export function normalizeChatCompletionResponse<T extends ChatCompletionChunk>(
+  message: T,
+  options: ChatCompletionNormalizationOptions = {},
+): T {
+  const choice = message.choices[0];
+  if (!choice?.message) return message;
+
+  const shouldExtractJson = options.extractJson ??
+    options.responseFormat?.type === "json_schema";
+  if (shouldExtractJson) {
+    const content = choice.message.content ?? "";
+    const json = extractJsonFromContent(content);
+    if (json !== null) {
+      choice.message.content = JSON.stringify(json);
+    }
+  }
+
+  const shouldParseTools = options.parseTools ?? !!options.tools?.length;
+  if (shouldParseTools && options.tools?.length) {
+    const { cleanContent, toolCalls } = new BracketToolProtocol().parse(
+      choice.message.content ?? "",
+    );
+    choice.message.content = cleanContent;
+    if (toolCalls.length) {
+      choice.message.tool_calls = toolCalls;
+      choice.finish_reason = "tool_calls";
+    }
+  }
+
+  return message;
 }
 
 export function normalizeJsonSchema(
