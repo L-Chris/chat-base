@@ -22,6 +22,7 @@ export interface EventSourceTransformerOptions {
 }
 
 export abstract class EventSourceOpenAITransformer {
+  private readonly callbacks: Array<() => void> = [];
   private readonly decoder = new TextDecoder();
   private readonly hooks: EventSourceTransformerHooks;
   private readonly parser;
@@ -61,6 +62,10 @@ export abstract class EventSourceOpenAITransformer {
     return this.stream;
   }
 
+  onDone(callback: () => void): void {
+    this.callbacks.push(callback);
+  }
+
   protected abstract handleEvent(
     event: EventSourceMessage,
     writer: OpenAIStreamWriter,
@@ -74,6 +79,7 @@ export abstract class EventSourceOpenAITransformer {
     this.finished = true;
     writer.finish(options);
     this.hooks.onDone?.();
+    this.callbacks.forEach((callback) => callback());
   }
 
   private async read() {
@@ -123,4 +129,47 @@ export abstract class EventSourceOpenAITransformer {
       this.finish(this.writer);
     }
   }
+}
+
+export abstract class JsonEventSourceOpenAITransformer<
+  TChunk,
+> extends EventSourceOpenAITransformer {
+  protected handleEvent(
+    event: EventSourceMessage,
+    writer: OpenAIStreamWriter,
+  ): void {
+    if (!event.data || this.shouldSkipEvent(event)) return;
+    if (event.data === "[DONE]") {
+      this.finish(writer);
+      return;
+    }
+
+    let chunk: TChunk;
+    try {
+      chunk = JSON.parse(event.data) as TChunk;
+    } catch (error) {
+      this.handleMalformedEvent(event, error, writer);
+      return;
+    }
+
+    this.handleChunk(chunk, event, writer);
+  }
+
+  protected shouldSkipEvent(_event: EventSourceMessage): boolean {
+    return false;
+  }
+
+  protected handleMalformedEvent(
+    _event: EventSourceMessage,
+    _error: unknown,
+    _writer: OpenAIStreamWriter,
+  ): void {
+    // Providers sometimes emit heartbeat or non-JSON progress lines.
+  }
+
+  protected abstract handleChunk(
+    chunk: TChunk,
+    event: EventSourceMessage,
+    writer: OpenAIStreamWriter,
+  ): void;
 }

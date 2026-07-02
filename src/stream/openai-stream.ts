@@ -126,3 +126,105 @@ export class OpenAIStreamWriter {
     this.controller.enqueue(this.encoder.encodeData(chunk));
   }
 }
+
+export interface CollectedOpenAIStream {
+  id: string;
+  model: string;
+  content: string;
+  reasoningContent: string;
+  citations: unknown[];
+  usage?: Usage;
+  toolCalls: ToolCall[];
+  finishReason: "stop" | "tool_calls" | "length" | "content_filter";
+  created: number;
+}
+
+export async function collectOpenAIStream(
+  stream: ReadableStream<Uint8Array>,
+  options: { model: string; id?: string; created?: number },
+): Promise<CollectedOpenAIStream> {
+  const decoder = new TextDecoder();
+  const reader = stream.getReader();
+  let buffer = "";
+  let content = "";
+  let reasoningContent = "";
+  let citations: unknown[] = [];
+  let usage: Usage | undefined;
+  let lastError: string | null = null;
+  let id = options.id ?? "";
+  let created = options.created ?? nowUnixSeconds();
+  let finishReason: CollectedOpenAIStream["finishReason"] = "stop";
+  const toolCalls: ToolCall[] = [];
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        const tail = decoder.decode();
+        if (tail) buffer += tail;
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split(/\n\n/);
+      buffer = events.pop() ?? "";
+
+      for (const event of events) {
+        const line = event.split("\n").find((item) =>
+          item.startsWith("data: ")
+        );
+        if (!line) continue;
+        const data = line.slice(6).trim();
+        if (!data || data === "[DONE]") continue;
+
+        try {
+          const chunk = JSON.parse(data) as ChatCompletionChunk;
+          if (chunk.error) {
+            lastError = chunk.error.message;
+            continue;
+          }
+
+          if (chunk.id) id = chunk.id;
+          if (chunk.created) created = chunk.created;
+          if (chunk.citations?.length) citations = chunk.citations;
+          if (chunk.usage) usage = chunk.usage;
+
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
+          if (choice.finish_reason) {
+            finishReason = choice.finish_reason as CollectedOpenAIStream[
+              "finishReason"
+            ];
+          }
+
+          const delta = choice.delta;
+          if (delta?.content) content += delta.content;
+          if (delta?.reasoning_content) {
+            reasoningContent += delta.reasoning_content;
+          }
+          if (delta?.tool_calls?.length) {
+            toolCalls.push(...delta.tool_calls);
+          }
+        } catch {
+          // Ignore malformed downstream chunks.
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (lastError) throw new Error(lastError);
+
+  return {
+    id,
+    model: options.model,
+    content,
+    reasoningContent,
+    citations,
+    usage,
+    toolCalls,
+    finishReason: toolCalls.length ? "tool_calls" : finishReason,
+    created,
+  };
+}
