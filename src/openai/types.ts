@@ -73,6 +73,7 @@ export interface ChatCompletionRequest {
   response_format?: ResponseFormat;
   tools?: Tool[];
   tool_choice?: ToolChoice;
+  parallel_tool_calls?: boolean;
   [key: string]: unknown;
 }
 

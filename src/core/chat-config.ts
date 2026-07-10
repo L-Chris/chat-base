@@ -25,6 +25,7 @@ export interface BaseChatConfig {
   chatType: "t2t" | "t2v" | "t2i" | "search" | "artifacts";
   tools: Tool[];
   toolChoice: ToolChoice;
+  parallelToolCalls: boolean;
   isToolCalling: boolean;
   isToolCallingDone: boolean;
   toolDelimiter?: ToolCallDelimiterMarkers;
@@ -39,6 +40,7 @@ export interface ChatConfigInput {
   messages: ChatMessage[];
   tools?: Tool[];
   toolChoice?: ToolChoice;
+  parallelToolCalls?: boolean;
   defaultModel?: string;
 }
 
@@ -89,6 +91,7 @@ export class ModelFlagChatConfigStrategy implements ChatConfigStrategy {
         : "t2t",
       tools,
       toolChoice: input.toolChoice ?? "auto",
+      parallelToolCalls: input.parallelToolCalls ?? true,
       isToolCalling,
       isToolCallingDone,
       toolDelimiter: this.options.delimiterTools && tools.length

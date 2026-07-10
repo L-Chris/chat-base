@@ -17,8 +17,13 @@ export interface MergeMessagesOptions<
   attachments?: TAttachment[];
   tools?: Tool[];
   toolChoice?: ToolChoice;
+  parallelToolCalls?: boolean;
   toolPromptMode?: ToolPromptMode;
-  buildToolPrompt?: (tools: Tool[], toolChoice?: ToolChoice) => string;
+  buildToolPrompt?: (
+    tools: Tool[],
+    toolChoice?: ToolChoice,
+    parallelToolCalls?: boolean,
+  ) => string;
   buildUserContent?: (content: string, attachments: TAttachment[]) =>
     | TMessage["content"]
     | ChatMessage["content"];
@@ -62,6 +67,7 @@ export function mergeMessages<
   const toolPrompt = buildToolPrompt(
     options.tools,
     options.toolChoice,
+    options.parallelToolCalls,
     options,
   );
   if (
@@ -132,18 +138,28 @@ export function mergeMessages<
 function buildToolPrompt(
   tools: Tool[] | undefined,
   toolChoice: ToolChoice | undefined,
+  parallelToolCalls: boolean | undefined,
   options: {
     toolPromptMode?: ToolPromptMode;
-    buildToolPrompt?: (tools: Tool[], toolChoice?: ToolChoice) => string;
+    buildToolPrompt?: (
+      tools: Tool[],
+      toolChoice?: ToolChoice,
+      parallelToolCalls?: boolean,
+    ) => string;
   },
 ): string {
   const items = tools ?? [];
   if (!items.length || options.toolPromptMode === "none") return "";
   return (options.buildToolPrompt ??
-    ((promptTools, choice) =>
-      new BracketToolProtocol().buildSystemPrompt(promptTools, choice)))(
+    ((promptTools, choice, parallel) =>
+      new BracketToolProtocol().buildSystemPrompt(
+        promptTools,
+        choice,
+        parallel,
+      )))(
       items,
       toolChoice,
+      parallelToolCalls,
     );
 }
 
