@@ -29,6 +29,7 @@ export function responsesRequestToChatCompletionRequest(
     response_format: body.response_format,
     tools: body.tools,
     tool_choice: body.tool_choice,
+    parallel_tool_calls: body.parallel_tool_calls,
   };
 }
 
@@ -520,7 +521,7 @@ function buildBaseResponsesResponse(params: {
     temperature: params.request?.temperature ?? null,
     top_p: null,
     tool_choice: params.request?.tool_choice ?? null,
-    parallel_tool_calls: false,
+    parallel_tool_calls: params.request?.parallel_tool_calls ?? true,
     metadata: params.request?.metadata ?? {},
   };
 }

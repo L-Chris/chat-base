@@ -16,6 +16,7 @@ export interface ResponsesRequest {
   max_output_tokens?: number;
   tools?: Tool[];
   tool_choice?: ToolChoice;
+  parallel_tool_calls?: boolean;
   response_format?: ResponseFormat;
   previous_response_id?: string;
   metadata?: Record<string, string>;

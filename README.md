@@ -4,7 +4,7 @@
 wrappers. It provides the shared server, stream, type, and utility layers used
 to build provider adapters without copying request and SSE boilerplate.
 
-Current package: `@rethinkos/chat-base@0.7.2`
+Current package: `@rethinkos/chat-base@0.7.4`
 
 ## Layers
 
@@ -49,6 +49,7 @@ class ExampleProvider extends BaseChatProvider<string> {
       responseFormat: body.response_format,
       tools: body.tools,
       toolChoice: body.tool_choice,
+      parallelToolCalls: body.parallel_tool_calls,
     });
   }
 
@@ -117,8 +118,12 @@ const response = await upstream.createCompletion({
   messages,
   responseFormat: body.response_format,
   tools: body.tools,
+  parallelToolCalls: body.parallel_tool_calls,
 });
 ```
+
+`parallel_tool_calls` follows the OpenAI default of `true`. Set it to `false`
+when a provider must issue at most one tool call per assistant response.
 
 ## Mapped JSON Stream
 

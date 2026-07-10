@@ -1,7 +1,9 @@
 import {
+  BracketToolProtocol,
   bytesToBase64,
   DelimitedToolCallBuffer,
   DelimitedToolProtocol,
+  mergeMessages,
   type ToolCallDelimiterMarkers,
 } from "../../mod.ts";
 import { assert, assertEquals } from "jsr:@std/assert@^1.0.14";
@@ -64,4 +66,54 @@ Deno.test("DelimitedToolCallBuffer flushes incomplete tool call as text", () => 
     content: ["<tc><name>broken"],
     toolCalls: [],
   });
+});
+
+Deno.test("tool protocols describe serial and parallel tool calls", () => {
+  const tools = [{ type: "function" as const, function: { name: "search" } }];
+
+  assert(
+    new DelimitedToolProtocol(markers).buildSystemPrompt(tools, "auto", true)
+      .includes("Repeat the block for each tool call"),
+  );
+  assert(
+    new BracketToolProtocol().buildSystemPrompt(tools, "auto", false)
+      .includes("at most one tool"),
+  );
+});
+
+Deno.test("mergeMessages passes parallel tool call preference to its prompt", () => {
+  const messages = mergeMessages(
+    [{ role: "user", content: "hi" }],
+    {
+      tools: [{ type: "function", function: { name: "search" } }],
+      parallelToolCalls: false,
+    },
+  );
+
+  assert(
+    typeof messages[0].content === "string" &&
+      messages[0].content.includes("at most one tool"),
+  );
+});
+
+Deno.test("DelimitedToolCallBuffer preserves parallel tool calls", () => {
+  const buffer = new DelimitedToolCallBuffer(
+    new DelimitedToolProtocol(markers),
+  );
+
+  const result = buffer.push(
+    '<tc><name>search</name><args>{"q":"deno"}</args></tc>' +
+      '<tc><name>lookup</name><args>{"id":1}</args></tc>',
+  );
+
+  assertEquals(
+    result.toolCalls.map((call) => ({
+      name: call.function.name,
+      index: call.index,
+    })),
+    [
+      { name: "search", index: 0 },
+      { name: "lookup", index: 1 },
+    ],
+  );
 });

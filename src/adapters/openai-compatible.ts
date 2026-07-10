@@ -42,6 +42,7 @@ export interface OpenAICompatibleRequestOptions {
   responseFormat?: ResponseFormat;
   tools?: Tool[];
   toolChoice?: ToolChoice;
+  parallelToolCalls?: boolean;
   extra?: Record<string, unknown>;
   apiKey?: string;
 }
@@ -173,6 +174,7 @@ export class OpenAICompatibleProvider<TAuth = string>
       responseFormat: body.response_format,
       tools: body.tools,
       toolChoice: body.tool_choice,
+      parallelToolCalls: body.parallel_tool_calls,
       messages: body.messages,
     });
   }
@@ -187,6 +189,7 @@ export class OpenAICompatibleProvider<TAuth = string>
       responseFormat: input.config.responseFormat,
       tools: input.config.tools,
       toolChoice: input.config.toolChoice,
+      parallelToolCalls: input.config.parallelToolCalls,
     });
   }
 
@@ -200,6 +203,7 @@ export class OpenAICompatibleProvider<TAuth = string>
       responseFormat: input.config.responseFormat,
       tools: input.config.tools,
       toolChoice: input.config.toolChoice,
+      parallelToolCalls: input.config.parallelToolCalls,
     });
   }
 
@@ -256,6 +260,9 @@ export function buildOpenAICompatibleChatBody(
     ...(tools.length ? { tools } : {}),
     ...(tools.length && options.toolChoice
       ? { tool_choice: options.toolChoice }
+      : {}),
+    ...(typeof options.parallelToolCalls === "boolean"
+      ? { parallel_tool_calls: options.parallelToolCalls }
       : {}),
     ...options.extra,
   };

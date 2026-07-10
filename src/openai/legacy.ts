@@ -35,6 +35,7 @@ export namespace OpenAI {
     stream: boolean;
     tools: OpenAITool[];
     tool_choice: OpenAIToolChoice;
+    parallel_tool_calls: boolean;
     is_tool_calling?: boolean;
     is_tool_calling_done?: boolean;
     toolDelimiter?: OpenAIToolCallDelimiterMarkers;

@@ -72,7 +72,11 @@ export class DelimitedToolProtocol {
     this.markers = markers;
   }
 
-  buildSystemPrompt(tools: Tool[], toolChoice?: ToolChoice): string {
+  buildSystemPrompt(
+    tools: Tool[],
+    toolChoice?: ToolChoice,
+    parallelToolCalls = true,
+  ): string {
     if (!tools.length) return "";
 
     const descriptions = tools.map((tool) => {
@@ -85,13 +89,16 @@ export class DelimitedToolProtocol {
     const required = toolChoice === "required"
       ? "\nYou must call at least one tool before responding to the user."
       : "";
+    const serial = !parallelToolCalls
+      ? "\n- You may call at most one tool in this response."
+      : "";
 
     return `## Tool Calling
 
 You have access to the following tools:
 ${descriptions}
 
-When a tool is needed, output ONLY this block and stop:
+When a tool is needed, output ONLY one or more of these blocks, then stop:
 
 ${this.markers.TC_START}
 ${this.markers.NAME_START}function_name${this.markers.NAME_END}
@@ -101,7 +108,8 @@ ${this.markers.TC_END}
 Rules:
 - Never invent tool results.
 - Never mix normal prose with a tool call block.
-- After ${this.markers.TC_END}, stop generating.${required}`;
+- Repeat the block for each tool call when parallel tool calls are allowed.
+- After the final ${this.markers.TC_END}, stop generating.${required}${serial}`;
   }
 
   serializeToolCall(toolCall: ToolCall): string {
@@ -149,7 +157,11 @@ Rules:
 }
 
 export class BracketToolProtocol {
-  buildSystemPrompt(tools: Tool[], toolChoice?: ToolChoice): string {
+  buildSystemPrompt(
+    tools: Tool[],
+    toolChoice?: ToolChoice,
+    parallelToolCalls = true,
+  ): string {
     if (!tools.length) return "";
 
     const lines = [
@@ -168,6 +180,9 @@ export class BracketToolProtocol {
       lines.push(
         "You must call at least one tool before responding to the user.",
       );
+    }
+    if (!parallelToolCalls) {
+      lines.push("You may call at most one tool in this response.");
     }
     lines.push(`[ToolCalls]
 [Call:tool_name]
