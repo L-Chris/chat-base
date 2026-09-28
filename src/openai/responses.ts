@@ -209,6 +209,11 @@ export function appendJsonSchemaPrompt<T extends ChatMessage>(
   const message = target[lastUserIndex];
   if (typeof message.content === "string") {
     target[lastUserIndex] = { ...message, content: message.content + prompt };
+  } else if (Array.isArray(message.content)) {
+    target[lastUserIndex] = {
+      ...message,
+      content: [...message.content, { type: "text", text: prompt }],
+    };
   }
   return target;
 }

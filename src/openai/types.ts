@@ -4,7 +4,7 @@ export interface ChatMessagePart {
   type: "text" | "file" | "image" | "image_url";
   text?: string;
   file_url?: { url: string };
-  image_url?: { url: string };
+  image_url?: { url: string; detail?: "auto" | "low" | "high" | "original" };
   [key: string]: unknown;
 }
 

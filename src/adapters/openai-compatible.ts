@@ -190,6 +190,7 @@ export class OpenAICompatibleProvider<TAuth = string>
       tools: input.config.tools,
       toolChoice: input.config.toolChoice,
       parallelToolCalls: input.config.parallelToolCalls,
+      extra: this.requestExtras(input.body),
     });
   }
 
@@ -204,6 +205,7 @@ export class OpenAICompatibleProvider<TAuth = string>
       tools: input.config.tools,
       toolChoice: input.config.toolChoice,
       parallelToolCalls: input.config.parallelToolCalls,
+      extra: this.requestExtras(input.body),
     });
   }
 
@@ -211,6 +213,25 @@ export class OpenAICompatibleProvider<TAuth = string>
     context: RequestContext<TAuth>,
   ): Promise<ListModelsResponse> {
     return await this.client.listModels(this.apiKey(context.auth));
+  }
+
+  private requestExtras(body: ChatCompletionRequest): Record<string, unknown> {
+    // These fields are handled by the adapter (id is a local conversation id).
+    // Preserve other standard and provider-specific options, including thinking,
+    // reasoning_effort, sampling settings, token limits, and stream_options.
+    const handled = new Set([
+      "id",
+      "model",
+      "messages",
+      "stream",
+      "response_format",
+      "tools",
+      "tool_choice",
+      "parallel_tool_calls",
+    ]);
+    return Object.fromEntries(
+      Object.entries(body).filter(([key]) => !handled.has(key)),
+    );
   }
 
   private apiKey(auth: TAuth): string {
@@ -238,14 +259,9 @@ export function buildOpenAICompatibleChatBody(
   },
 ): ChatCompletionRequest {
   const jsonSchemaMode = options.jsonSchemaMode ?? "json_object";
-  const messages = normalizeTextMessages(
-    jsonSchemaMode === "prompt"
-      ? appendJsonSchemaPrompt(
-        options.messages,
-        options.responseFormat,
-      )
-      : options.messages,
-  );
+  const messages = jsonSchemaMode === "prompt"
+    ? appendJsonSchemaPrompt(options.messages, options.responseFormat)
+    : options.messages;
   const responseFormat = resolveResponseFormat(
     options.responseFormat,
     jsonSchemaMode,
